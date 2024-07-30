@@ -85,7 +85,7 @@ export class AuthService {
       throw new ConflictException("Email doesn't exists");
     }
     if (password !== newPassword){
-      throw new Error("Password didn't match try again")
+      throw new Error("Passwords didn't match try again")
     }
     await this.usersService.confirmPassword(email, password)
     return "Password updated"
