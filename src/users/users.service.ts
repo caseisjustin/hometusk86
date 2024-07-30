@@ -27,6 +27,10 @@ export class UsersService {
     await this.usersRepository.update(userId, { password: newPassword });
   }
 
+  async confirmPassword(email: string, newPassword: string): Promise<void> {
+    await this.usersRepository.update(email, {password: newPassword})
+  }
+
   async confirmEmail(userId: number): Promise<void> {
     await this.usersRepository.update(userId, { isEmailConfirmed: true, emailVerificationToken: null, emailVerificationTokenExpires: null });
   }

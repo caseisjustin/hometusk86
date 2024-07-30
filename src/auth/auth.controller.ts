@@ -32,7 +32,15 @@ export class AuthController {
     return this.authService.forgotPassword(email);
   }
 
-  @Post('verify-email')
+  @Post('verifypass')
+  async verifyPassword(@Body() body, @Query() param){
+    const { password, newPassword} = body
+    const {token} = param
+    console.log(token)
+    return this.authService.confirmPassword(token, password, newPassword);
+  }
+kjk
+  @Get('verify-email')
   async verifyAndConfirmEmail(@Query() body) {
     const { token } = body;
     return this.authService.verifyAndConfirmEmail(token);

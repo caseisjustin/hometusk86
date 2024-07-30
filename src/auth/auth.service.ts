@@ -11,7 +11,7 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private mailerService: MailerService,
-  ) {}
+  ) { }
 
   async validateUser(username: string, pass: string): Promise<any> {
     const user = await this.usersService.findOne(username);
@@ -22,7 +22,7 @@ export class AuthService {
     return null;
   }
 
-  async register(username: string, email: string, pass: string): Promise<Partial<User | {message: string}>> {
+  async register(username: string, email: string, pass: string): Promise<Partial<User | { message: string }>> {
     const existingUser = await this.usersService.findOne(username);
     if (existingUser) {
       throw new ConflictException('Username already exists');
@@ -42,8 +42,8 @@ export class AuthService {
     });
 
     await this.sendVerificationEmail(email, emailVerificationToken);
-  
-    return {message: "You have successfuly signed up", username: user.username, email: user.email};
+
+    return { message: "You have successfuly signed up", username: user.username, email: user.email };
   }
 
   async sendVerificationEmail(email: string, token: string) {
@@ -51,30 +51,44 @@ export class AuthService {
     await this.mailerService.sendMail({
       to: email,
       subject: 'Email Verification',
-      text: `Please verify your email by clicking the following link: ${url}`,
+      html: `Please verify your email by clicking the following link: <a href=${url}>verify</a>`,
     });
   }
 
   async login(user: any) {
     const payload = { username: user.username, sub: user.userId };
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: this.jwtService.sign(payload, { expiresIn: '1h' }),
     };
   }
 
-  async resetPassword(email: string, oldPassword: string, newPassword: string, confirmNewPassword: string): Promise<void> {
+  async resetPassword(email: string, oldPassword: string, newPassword: string, confirmNewPassword: string): Promise<string> {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
       throw new Error('User not found');
     }
-    if ( !(await bcrypt.compare(oldPassword, user.password))) {
+    if (!(await bcrypt.compare(oldPassword, user.password))) {
       throw new Error("Invalid Password");
     }
-    if( newPassword !== confirmNewPassword){
+    if (newPassword !== confirmNewPassword) {
       throw new Error("Passwords not matched.")
     }
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await this.usersService.updatePassword(user.id, hashedPassword);
+    return "Password updated"
+  }
+
+  async confirmPassword(token: string, password: string, newPassword: string): Promise<string> {
+    const { email } = this.jwtService.verify(token)
+    const existingEmail = await this.usersService.findByEmail(email);
+    if (!existingEmail) {
+      throw new ConflictException("Email doesn't exists");
+    }
+    if (password !== newPassword){
+      throw new Error("Password didn't match try again")
+    }
+    await this.usersService.confirmPassword(email, password)
+    return "Password updated"
   }
 
   async forgotPassword(email: string): Promise<string> {
@@ -82,12 +96,16 @@ export class AuthService {
     if (!user) {
       throw new Error('User not found');
     }
-    const token = this.jwtService.sign({ email }, { expiresIn: '1h' });
-    // Send email logic here with the token
+    const token = this.jwtService.sign({ email }, { expiresIn: '10m' });
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Password resetion',
+      html: `http://localhost:3000/auth/verifypass?token=${token}`,
+    });
     return token;
   }
 
-  async verifyAndConfirmEmail(token: string): Promise<void> {
+  async verifyAndConfirmEmail(token: string): Promise<string> {
     const { email } = this.jwtService.verify(token);
     const user = await this.usersService.findByEmail(email);
     if (!user) {
@@ -100,6 +118,7 @@ export class AuthService {
       throw new ConflictException('Verification token expired');
     }
     await this.usersService.confirmEmail(user.id);
+    return "Your account has been confirmed"
   }
 
   async renewTokens(user: any) {
